@@ -1,0 +1,473 @@
+# dino-game-
+e um jogo simples que fiz com muito carinho 
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo do Dino</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f5f5dc;
+            font-family: Arial, sans-serif;
+        }
+        #startScreen, #colorSelection, #gameOverScreen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        canvas {
+            display: block;
+            background: #ffffff;
+            border: 2px solid #000;
+            width: 100%;
+            max-width: 800px;
+            height: auto;
+        }
+        #gameOverScreen {
+            display: none;
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(4, 4, 4, 0.8);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 30px;
+        }
+        .button {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+        }
+        .color-picker {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 10px 0;
+        }
+        .color-box {
+            width: 30px;
+            height: 30px;
+            margin: 5px;
+            cursor: pointer;
+            border: 2px solid #000;
+        }
+        .control-buttons {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .control-button {
+            width: 80px; /* Aumenta a largura do botão */
+            height: 80px; /* Aumenta a altura do botão */
+            margin: 0 60px; /* Aumenta o espaço entre os botões */
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 40px; /* Faz os botões redondos */
+            font-size: 20px;
+            cursor: pointer;
+        }
+        @media (max-width: 600px) {
+            .button {
+                padding: 10px;
+                font-size: 16px;
+            }
+            .color-box {
+                width: 25px;
+                height: 25px;
+            }
+            .control-button {
+                width: 70px; /* Ajusta a largura do botão em telas menores */
+                height: 70px; /* Ajusta a altura do botão em telas menores */
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="startScreen">
+        <h1>Qual é o nome do seu dino?</h1>
+        <input type="text" id="nameInput" placeholder="Digite o nome do dino" />
+        <button id="startButton">Começar o Jogo</button>
+    </div>
+    <div id="colorSelection" style="display: none;">
+        <h2>Personalize seu Dino!</h2>
+        <div class="color-picker" id="colorPicker">
+            <!-- Cores para personalização -->
+            <div class="color-box" style="background-color: #d3d3d3;" data-color="#d3d3d3"></div>
+            <div class="color-box" style="background-color: #ff0000;" data-color="#ff0000"></div>
+            <div class="color-box" style="background-color: #00ff00;" data-color="#00ff00"></div>
+            <div class="color-box" style="background-color: #0000ff;" data-color="#0000ff"></div>
+            <div class="color-box" style="background-color: #ffff00;" data-color="#ffff00"></div>
+            <div class="color-box" style="background-color: #ff00ff;" data-color="#ff00ff"></div>
+            <div class="color-box" style="background-color: #00ffff;" data-color="#00ffff"></div>
+            <div class="color-box" style="background-color: #800080;" data-color="#800080"></div>
+            <div class="color-box" style="background-color: #ffa500;" data-color="#ffa500"></div>
+            <div class="color-box" style="background-color: #000000;" data-color="#000000"></div>
+        </div>
+        <button id="confirmColorButton">Confirmar Cores</button>
+    </div>
+    <canvas id="gameCanvas" width="800" height="300"></canvas>
+    <div class="control-buttons" id="controlButtons" style="display: none;">
+        <button class="control-button" id="jumpButton">Pular</button>
+        <button class="control-button" id="shootButtonK">Atirar (K)</button>
+        <button class="control-button" id="shootButtonJ">Atirar (J)</button>
+    </div>
+    <div id="gameOverScreen">
+        <div id="gameOverMessage">Game Over ...</div>
+        <div id="finalScore"></div>
+        <button class="button" id="retryButton">Revanche</button>
+        <button class="button" id="quitButton">Desistir</button>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('startScreen');
+        const nameInput = document.getElementById('nameInput');
+        const startButton = document.getElementById('startButton');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const finalScore = document.getElementById('finalScore');
+        const colorSelection = document.getElementById('colorSelection');
+        const colorBoxes = document.querySelectorAll('.color-box');
+        const confirmColorButton = document.getElementById('confirmColorButton');
+        const controlButtons = document.getElementById('controlButtons');
+        const jumpButton = document.getElementById('jumpButton');
+        const shootButtonK = document.getElementById('shootButtonK');
+        const shootButtonJ = document.getElementById('shootButtonJ');
+
+        let dino = { 
+            x: 50, 
+            y: 250, 
+            width: 20, 
+            height: 20, 
+            gravity: 0.5, 
+            jump: -10, 
+            velocityY: 0, 
+            isJumping: false, 
+            jumpCount: 0,
+            color: '#d3d3d3' // Cor padrão do dino
+        };
+        
+        let obstacles = [];
+        let projectiles = [];
+        let score = 0;
+        let highScore = localStorage.getItem('highScore') ? parseInt(localStorage.getItem('highScore')) : 0;
+        let isGameActive = false;
+
+        const heartCount = 3;
+        let hearts = [];
+
+        for (let i = 0; i < heartCount; i++) {
+            hearts.push({ x: 720 + (i * 22), y: 10, alive: true });
+        }
+
+        let baseSpeed = 5;
+        let obstacleSpeed = baseSpeed;
+
+        const speedIncreaseInterval = 30000;
+        const speedMultiplier = 0.2;
+
+        // Controle de cooldown para tiros
+        let lastShootKTime = 0; // Último tempo do tiro da tecla K
+        let lastShootJTime = 0; // Último tempo do tiro da tecla J
+        const shootCooldown = 3000; // 3 segundos em milissegundos
+
+        function drawDino() {
+            ctx.fillStyle = dino.color; // Usa a cor personalizada
+            ctx.fillRect(dino.x, dino.y, dino.width, dino.height);
+        }
+
+        function drawObstacles() {
+            ctx.fillStyle = '#000';
+            obstacles.forEach(obstacle => {
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            });
+        }
+
+        function drawProjectiles() {
+            projectiles.forEach(projectile => {
+                ctx.fillStyle = projectile.color;
+                ctx.fillRect(projectile.x, projectile.y, projectile.width, projectile.height);
+            });
+        }
+
+        function drawScore() {
+            ctx.fillStyle = '#000';
+            ctx.font = '20px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText('Score: ' + score, 10, 20);
+        }
+
+        function drawHighScore() {
+            ctx.fillStyle = '#000';
+            ctx.font = '20px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText('High Score: ' + highScore, 150, 20);
+        }
+
+        function drawHearts() {
+            hearts.forEach(heart => {
+                if (heart.alive) {
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(heart.x, heart.y, 20, 20);
+                } else {
+                    ctx.fillStyle = '#000000';
+                    ctx.fillRect(heart.x, heart.y, 20, 20);
+                }
+            });
+        }
+
+        function updateObstacles() {
+            if (Math.random() < 0.02) {
+                const width = 30;  
+                const height = Math.random() * (dino.y - 50); 
+                obstacles.push({ x: canvas.width, y: canvas.height - height, width: width, height: height });
+            }
+            obstacles.forEach((obstacle, index) => {
+                obstacle.x -= obstacleSpeed;
+                if (obstacle.x < 0) obstacles.splice(index, 1);
+            });
+        }
+
+        function detectCollision() {
+            obstacles.forEach((obstacle, obstacleIndex) => {
+                if (dino.x < obstacle.x + obstacle.width && dino.x + dino.width > obstacle.x &&
+                    dino.y < obstacle.y + obstacle.height && dino.y + dino.height > obstacle.y) {
+                    loseHeart();
+                    obstacles = [];
+                    if (hearts.every(heart => !heart.alive)) {
+                        showGameOver();
+                    }
+                }
+            });
+        }
+
+        function jump() {
+            if (dino.jumpCount < 3 && isGameActive) {
+                dino.isJumping = true;
+                dino.velocityY = dino.jump;
+                dino.jumpCount++;
+            }
+        }
+
+        function shootK() {
+            const currentTime = Date.now(); // Tempo atual
+            if (currentTime - lastShootKTime >= shootCooldown) {
+                const projectile = { 
+                    x: dino.x + dino.width / 2 - 5,
+                    y: dino.y + 5, 
+                    width: 8,
+                    height: 4,
+                    color: '#ff0000'
+                };
+                projectiles.push(projectile);
+                lastShootKTime = currentTime; // Atualiza o tempo do último tiro
+            }
+        }
+
+        function shootJ() {
+            const currentTime = Date.now(); // Tempo atual
+            if (currentTime - lastShootJTime >= shootCooldown) {
+                const projectile = { 
+                    x: dino.x + dino.width / 2 - 5,
+                    y: dino.y + 5, 
+                    width: 8,
+                    height: 4,
+                    color: '#00ff00'
+                };
+                projectiles.push(projectile);
+                lastShootJTime = currentTime; // Atualiza o tempo do último tiro
+            }
+        }
+
+        function updateProjectiles() {
+            projectiles.forEach((projectile, projectileIndex) => {
+                projectile.x += 10;
+
+                if (projectile.x > canvas.width) {
+                    projectiles.splice(projectileIndex, 1);
+                    return;
+                }
+
+                obstacles.forEach((obstacle, obstacleIndex) => {
+                    if (
+                        projectile.x < obstacle.x + obstacle.width &&
+                        projectile.x + projectile.width > obstacle.x &&
+                        projectile.y < obstacle.y + obstacle.height &&
+                        projectile.y + projectile.height > obstacle.y
+                    ) {
+                        projectiles.splice(projectileIndex, 1);
+                        obstacles.splice(obstacleIndex, 1);
+                        return;
+                    }
+                });
+            });
+        }
+
+        function gameLoop() {
+            if (!isGameActive) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            dino.y += dino.velocityY;
+            dino.velocityY += dino.gravity;
+
+            if (dino.y + dino.height >= canvas.height) {
+                dino.y = canvas.height - dino.height;
+                dino.isJumping = false;
+                dino.jumpCount = 0;
+            }
+
+            updateObstacles();
+            updateProjectiles();
+            detectCollision();
+            drawDino();
+            drawObstacles();
+            drawProjectiles(); 
+            drawScore(); 
+            drawHighScore(); 
+            drawHearts(); 
+
+            ctx.fillStyle = '#000';
+            ctx.font = '20px Arial';
+            ctx.fillText(nameInput.value || "Dino", dino.x, dino.y - 10);
+
+            if (isGameActive) {
+                score++;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function showGameOver() {
+            isGameActive = false; 
+            gameOverScreen.style.display = 'flex';
+            finalScore.textContent = 'Pontuação Final: ' + score; 
+            if (score > highScore) {
+                highScore = score; 
+                localStorage.setItem('highScore', highScore); 
+            }
+        }
+
+        function loseHeart() {
+            const heart = hearts.find(h => h.alive);
+            if (heart) {
+                heart.alive = false; 
+            }
+        }
+
+        function increaseSpeed() {
+            obstacleSpeed += baseSpeed * speedMultiplier; 
+        }
+
+        startButton.addEventListener('click', () => {
+            const dinoName = nameInput.value.trim();
+            if (dinoName) {
+                startScreen.style.display = 'none'; 
+                colorSelection.style.display = 'block'; // Mostra a seleção de cores
+            } else {
+                alert('Por favor, digite um nome para o seu dino!');
+            }
+        });
+
+        colorBoxes.forEach(box => {
+            box.addEventListener('click', (event) => {
+                dino.color = event.target.getAttribute('data-color'); // Define a cor do dino
+                colorBoxes.forEach(b => b.style.border = '2px solid #000'); // Reseta a borda
+                event.target.style.border = '2px solid #ff0000'; // Destaca a cor selecionada
+            });
+        });
+
+        confirmColorButton.addEventListener('click', () => {
+            colorSelection.style.display = 'none'; // Esconde a seleção de cores
+            canvas.style.display = 'block'; 
+            controlButtons.style.display = 'flex'; // Mostra os botões de controle
+            isGameActive = true; 
+            score = 0; 
+            obstacles = []; 
+            projectiles = []; 
+            hearts.forEach(heart => heart.alive = true); 
+            obstacleSpeed = baseSpeed; 
+            gameLoop(); 
+
+            setInterval(() => {
+                if (isGameActive) {
+                    increaseSpeed();
+                }
+            }, speedIncreaseInterval);
+        });
+
+        retryButton.addEventListener('click', () => {
+            gameOverScreen.style.display = 'none'; 
+            obstacles = []; 
+            projectiles = []; 
+            score = 0; 
+            isGameActive = true; 
+
+            hearts.forEach(heart => heart.alive = true); 
+
+            obstacleSpeed = baseSpeed; 
+            gameLoop(); 
+        });
+
+        quitButton.addEventListener('click', () => {
+            gameOverScreen.style.display = 'none'; 
+            startScreen.style.display = 'flex'; 
+            nameInput.value = ''; 
+            obstacles = []; 
+            projectiles = []; 
+            score = 0; 
+            isGameActive = false; 
+        });
+
+        jumpButton.addEventListener('click', () => {
+            jump(); // Chama a função de pular
+        });
+
+        shootButtonK.addEventListener('click', () => {
+            shootK(); // Chama a função de atirar (K)
+        });
+
+        shootButtonJ.addEventListener('click', () => {
+            shootJ(); // Chama a função de atirar (J)
+        });
+
+        // Adiciona eventos de teclado
+        window.addEventListener('keydown', (event) => {
+            if (event.key === ' ') { // Barra de espaço para pular
+                jump();
+            }
+            if (event.key === 'k') { // Tecla K para atirar
+                shootK();
+            }
+            if (event.key === 'j') { // Tecla J para atirar
+                shootJ();
+            }
+        });
+
+        function init() {
+            startScreen.style.display = 'flex'; 
+            gameOverScreen.style.display = 'none'; 
+            canvas.style.display = 'none'; 
+            colorSelection.style.display = 'none'; // Esconde a seleção de cores inicialmente
+            controlButtons.style.display = 'none'; // Esconde os botões de controle inicialmente
+        }
+
+        init();
+    </script>
+</body>
+</html>
